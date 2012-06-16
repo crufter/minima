@@ -25,3 +25,18 @@ if (< n 8)
 for x
 	println "n is " n
 ```
+
+This above snippet will produce:
+
+```
+Multiline if.
+n is smaller than 8
+n is 6
+n is 6
+n is 6
+n is 6
+n is 6
+n is 6
+n is 6
+n is 6
+```
