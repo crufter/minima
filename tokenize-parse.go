@@ -56,9 +56,9 @@ func Tokenize(source string) []string {
 			if len(toks) > 0 && len(tokens) > i + 2 && tokens[i+2].Text != ")" {
 				toks = append(toks, "(")
 			}
-		// } else if v.Text == ";" { // Dont complicate things with this yet.
-		// 	toks = append(toks, ")")
-		// 	toks = append(toks, "(")
+		} else if v.Text == ";" {
+			toks = append(toks, ")")
+			toks = append(toks, "(")
 		} else if v.Text != "\t" {
 			toks = append(toks, v.Text)
 		}

@@ -23,7 +23,7 @@ var newstyle =
 -- This is a comment
 set n (+ 2 4)
 set x 8
-if (< n 8)
+if (< n x)
 	run
 		println "Multiline if."
 		println "n is smaller than " x
