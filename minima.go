@@ -29,8 +29,11 @@ type Func struct {
 	Com *Cmd
 }
 
-type (f *Func) Eval(vars) interface{} {
-	
+func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
+	for i, v := range f.Args {
+		f.Vars_.Set(v, params[i])
+	}
+	return f.Com.Eval(f.Vars_)
 }
 
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
@@ -97,12 +100,28 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 	default:			// Not builtin function call.
 		fun := vars.Get(c.Op)
 		if val, k := fun.(Func); k {
-			fun.Eval(vars)
+			params := []interface{}{}
+			for _, v := range c.Params {
+				var ap interface{}
+				if v.Params == nil {
+					pval, kind := kind(v.Op)
+					switch kind {
+					case id:
+						ap = vars.Get(pval.(string))
+					default:
+						ap = pval
+					}
+				} else {
+					ap = v.Eval(vars)
+				}
+				params = append(params, ap)
+			}
+			v = val.Eval(vars, params)
 		} else {
-			panic("Call of non-function ", c.Op)
+			panic("Call of non-function " + c.Op)
 		}
 	}
-	vars.Sym[vars.Lev]
+	vars.Sym[vars.Lev] = nil
 	vars.Lev--
 	return v
 }
@@ -111,8 +130,13 @@ func (c *Cmd) Add(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res += r.(int)
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				res += vars.Get(r.(string)).(int)
+			case in:
+				res += r.(int)
+			}
 		} else {
 			res += v.Eval(vars).(int)
 		}
@@ -124,8 +148,13 @@ func (c *Cmd) Div(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res /= r.(int)
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				res /= vars.Get(r.(string)).(int)
+			case in:
+				res /= r.(int)
+			}
 		} else {
 			res /= v.Eval(vars).(int)
 		}
@@ -173,11 +202,20 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	} else {
 		name = "lambda"
 	}
-	nvar := &Vars{}
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev+1}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars_: nvar}
-	if c.Params[c].Op
-	return
+	if len(c.Params) == co + 2 {		// Has parameters.
+		args := []string{c.Params[co].Op}
+		for _, v := range c.Params[co].Params {
+			args = append(args, v.Op)
+		}
+		f.Args = args
+		co++
+	}
+	f.Com = c.Params[co]
+	vars.Set(name, f)					// Not sure if it will be kept.
+	return f
 }
 
 func (c *Cmd) Less(vars *Vars) interface{} {
@@ -204,8 +242,13 @@ func (c *Cmd) Mul(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res *= r.(int)
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				res *= vars.Get(r.(string)).(int)
+			case in:
+				res *= r.(int)
+			}
 		} else {
 			res *= v.Eval(vars).(int)
 		}
@@ -215,11 +258,15 @@ func (c *Cmd) Mul(vars *Vars) interface{} {
 
 func (c *Cmd) Print(vars *Vars) interface{} {
 	for _, v := range c.Params {
-		val, k := kind(v.Op)
-		if k == id {
-			fmt.Print(vars.Get(val.(string)))
+		if v.Params != nil {
+			fmt.Print(v.Eval(vars))
 		} else {
-			fmt.Print(val)
+			val, k := kind(v.Op)
+			if k == id {
+				fmt.Print(vars.Get(val.(string)))
+			} else {
+				fmt.Print(val)
+			}
 		}
 	}
 	return 1
@@ -271,8 +318,13 @@ func (c *Cmd) Sub(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res -= r.(int)
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				res -= vars.Get(r.(string)).(int)
+			case in:
+				res -= r.(int)
+			}
 		} else {
 			res -= v.Eval(vars).(int)
 		}
