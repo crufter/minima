@@ -60,6 +60,22 @@ Produces:
 <nil>
 ```
 
+Closures are working too:
+```
+func l (u) (run
+	set m 9
+	func (v) (+ v u m))
+set p (l 10)
+println (p 30)
+println (p 40)
+```
+
+Produces:
+```
+49
+59
+```
+
 Goals
 ======
 - Create a language in pure Go
