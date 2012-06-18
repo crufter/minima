@@ -23,6 +23,16 @@ func kind(str string) (interface{}, int) {
 	return str, id
 }
 
+type Func struct {
+	Vars_ *Vars
+	Args []string
+	Com *Cmd
+}
+
+type (f *Func) Eval(vars) interface{} {
+	
+}
+
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
 type Vars struct {
 	Sym []map[string]interface{}
@@ -32,7 +42,7 @@ type Vars struct {
 func (v Vars) Get(varname string) interface{} {
 	var ret interface{}
 	for i:=v.Lev-1; i>=0 ;i-- {
-		if v.Sym[i] != nil {
+		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
 			ret, ok := v.Sym[i][varname]
 			if ok {
 				return ret
@@ -68,6 +78,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		v = c.If(vars)
 	case "for":
 		v = c.For(vars)
+	case "func":
+		v = c.Func(vars)
 	case "*":
 		v = c.Mul(vars)
 	case "print":
@@ -82,7 +94,15 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		v = c.Set(vars)
 	case "-":
 		v = c.Sub(vars)
+	default:			// Not builtin function call.
+		fun := vars.Get(c.Op)
+		if val, k := fun.(Func); k {
+			fun.Eval(vars)
+		} else {
+			panic("Call of non-function ", c.Op)
+		}
 	}
+	vars.Sym[vars.Lev]
 	vars.Lev--
 	return v
 }
@@ -141,6 +161,23 @@ func (c *Cmd) For(vars *Vars) interface{} {
 		c.Params[1].Eval(vars)
 	}
 	return nil
+}
+
+// Current imlementation will leak memory.
+func (c *Cmd) Func(vars *Vars) interface{} {
+	var name string
+	co := 0
+	if c.Params[0].Params == nil {
+		name = c.Params[0].Op
+		co++
+	} else {
+		name = "lambda"
+	}
+	nvar := &Vars{}
+	copy(nvar.Sym, vars.Sym)
+	f := Func{Vars_: nvar}
+	if c.Params[c].Op
+	return
 }
 
 func (c *Cmd) Less(vars *Vars) interface{} {
