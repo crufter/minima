@@ -65,16 +65,15 @@ Goals
 - Create a language in pure Go
 - Create a scripting language which is statically typed.
 
-Lates additions
+Latest additions
 ======
-- Variable scoping, functions.
+- Variable scoping, functions, closures.
 
 Roadmap
 ======
 - []interface{} and map[string]interface{} types to be able to handle JSON data.
 - More syntactic sugar (expect some neat things here).
 - More builtin goodies.
-- Closures.
 - Static typing.
 - Packages.
 - A mongodb driver ;)
