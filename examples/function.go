@@ -12,7 +12,7 @@ set k 10
 func l (u) (run
 	println k
 	+ u u u u)
-println (l 10) 
+println (l 20) 
 println u
 `
 
