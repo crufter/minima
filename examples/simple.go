@@ -33,15 +33,9 @@ for x
 `
 
 func main() {
-	//old := minima.TokenizeOld(oldstyle)
-	neu := minima.Tokenize(newstyle)
-	//fmt.Println(old)
-	//fmt.Println(neu)
-	p := minima.Parse(neu)
-	//Visualize(p, "   ", 0)
 	t := time.Now()
+	neu := minima.Tokenize(newstyle)
+	p := minima.Parse(neu)
 	minima.Eval(p)
-	//fmt.Println(ev)
 	fmt.Println(time.Since(t))
-	//Visualize(p, "   ", 0)
 }

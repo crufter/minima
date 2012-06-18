@@ -13,15 +13,16 @@ func evalErr() {
 
 func Eval(cmd Cmd) interface{} {
 	//defer evalErr()
-	env := Env{map[string]interface{}{}}
-	ev := cmd.Eval(&env)
+	vars := Vars{make([]map[string]interface{}, 50), 0}
+	ev := cmd.Eval(&vars)
 	return ev
 }
 
 func EvalWith(cmd Cmd, inp map[string]interface{}) interface{} {
-	defer evalErr()
-	env := Env{inp}
-	ev := cmd.Eval(&env)
+	//defer evalErr()
+	vars := Vars{make([]map[string]interface{}, 50), 0}
+	vars.Sym[0] = map[string]interface{}{"en":inp}
+	ev := cmd.Eval(&vars)
 	return ev
 }
 

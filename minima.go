@@ -23,8 +23,30 @@ func kind(str string) (interface{}, int) {
 	return str, id
 }
 
-type Env struct {
-	Symbols map[string]interface{}
+// I sense some ignorance of multithreading here, but hey, it's just a prototype.
+type Vars struct {
+	Sym []map[string]interface{}
+	Lev int
+}
+
+func (v Vars) Get(varname string) interface{} {
+	var ret interface{}
+	for i:=v.Lev-1; i>=0 ;i-- {
+		if v.Sym[i] != nil {
+			ret, ok := v.Sym[i][varname]
+			if ok {
+				return ret
+			}
+		}
+	}
+	return ret
+}
+
+func (v Vars) Set(varname string, val interface{}) {
+	if v.Sym[v.Lev-1] == nil {
+		v.Sym[v.Lev-1] = map[string]interface{}{}
+	}
+	v.Sym[v.Lev-1][varname] = val
 }
 
 type Cmd struct {
@@ -32,117 +54,107 @@ type Cmd struct {
 	Params	[]*Cmd
 }
 
-func (c *Cmd) Eval(env *Env) interface{} {
+func (c *Cmd) Eval(vars *Vars) interface{} {
+	vars.Lev++
+	var v interface{}
 	switch c.Op {
-	case "run":
-		return c.Run(env)
 	case "+":
-		return c.Add(env)
-	case "-":
-		return c.Sub(env)
-	case "*":
-		return c.Mul(env)
+		v = c.Add(vars)
 	case "/":
-		return c.Div(env)
+		v = c.Div(vars)
 	case "<":
-		return c.Lesser(env)
-	case "set":
-		return c.Set(env)
+		v = c.Less(vars)
 	case "if":
-		return c.If(env)
+		v = c.If(vars)
 	case "for":
-		return c.For(env)
+		v = c.For(vars)
+	case "*":
+		v = c.Mul(vars)
 	case "print":
-		return c.Print(env)
+		v = c.Print(vars)
 	case "println":
-		return c.Println(env)
+		v = c.Println(vars)
 	case "read":
-		return c.Read(env)
+		v = c.Read(vars)
+	case "run":
+		v = c.Run(vars)
+	case "set":
+		v = c.Set(vars)
+	case "-":
+		v = c.Sub(vars)
 	}
-	return nil
+	vars.Lev--
+	return v
 }
 
-func (c *Cmd) Add(env *Env) interface{} {
+func (c *Cmd) Add(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
 			r, _ := kind(v.Op)
 			res += r.(int)
 		} else {
-			res += v.Eval(env).(int)
+			res += v.Eval(vars).(int)
 		}
 	}
 	return res
 }
 
-func (c *Cmd) Sub(env *Env) interface{} {
-	var res int
-	for _, v := range c.Params{
-		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res -= r.(int)
-		} else {
-			res -= v.Eval(env).(int)
-		}
-	}
-	return res
-}
-
-func (c *Cmd) Mul(env *Env) interface{} {
-	var res int
-	for _, v := range c.Params{
-		if v.Params == nil {
-			r, _ := kind(v.Op)
-			res *= r.(int)
-		} else {
-			res *= v.Eval(env).(int)
-		}
-	}
-	return res
-}
-
-func (c *Cmd) Div(env *Env) interface{} {
+func (c *Cmd) Div(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
 		if v.Params == nil {
 			r, _ := kind(v.Op)
 			res /= r.(int)
 		} else {
-			res /= v.Eval(env).(int)
+			res /= v.Eval(vars).(int)
 		}
 	}
 	return res
 }
 
-func (c *Cmd) For(env *Env) interface{} {
+// TODO: current syntax rules makes a the second and third param of if (call anything) tp ((call anything)) which means (run (call anything))
+// Same applies to for and all "cotrol structures".
+func (c *Cmd) If(vars *Vars) interface{} {
+	v := c.Params[0].Eval(vars)
+	var ret interface{}
+	if v.(bool) {
+		ret = c.Params[1].Eval(vars)
+	} else {
+		ret = c.Params[2].Eval(vars)
+	}
+	return ret
+}
+
+func (c *Cmd) For(vars *Vars) interface{} {
 	v, k := kind(c.Params[0].Op)
 	var val int
 	if k == in {
 		val = v.(int)
 	} else if k == id {
-		val = env.Symbols[v.(string)].(int)
+		val = vars.Get(v.(string)).(int)
 	}
 	for i:=0;i<val;i++{
 		if i == val-1 {
-			return c.Params[1].Eval(env)
+			return c.Params[1].Eval(vars)
 		}
-		c.Params[1].Eval(env)
+		c.Params[1].Eval(vars)
 	}
 	return nil
 }
 
-func (c *Cmd) Lesser(env *Env) interface{} {
+func (c *Cmd) Less(vars *Vars) interface{} {
 	if c.Params[0].Params == nil && c.Params[1].Params == nil {
 		v1, k1 := kind(c.Params[0].Op)
 		v2, k2 := kind(c.Params[1].Op)
 		var val1, val2 int
 		if k1 == id {
-			val1 = env.Symbols[v1.(string)].(int)
+			val1 = vars.Get(v1.(string)).(int)
 		} else {
 			val1 = v1.(int)
 		}
 		if k2 == id {
-			val2 = env.Symbols[v2.(string)].(int)
+			val2 = vars.Get(v2.(string)).(int)
 		} else {
 			val2 = v2.(int)
 		}
@@ -151,74 +163,82 @@ func (c *Cmd) Lesser(env *Env) interface{} {
 	return false
 }
 
-func (c *Cmd) Run(env *Env) interface{} {
-	if len(c.Params) == 1 {
-		return c.Params[0].Eval(env)
-	}
-	l := len(c.Params)
-	for i, v := range c.Params {
-		if i == l-1 {
-			return v.Eval(env)
-		}
-		v.Eval(env)
-	}
-	return nil
-}
-
-func (c *Cmd) Set(env *Env) interface{} {
-	if c.Params[1].Params != nil {
-		v := c.Params[1].Eval(env)
-		switch v.(type) {
-		case int:
-			env.Symbols[c.Params[0].Op] = v.(int)
-		case string:
-			env.Symbols[c.Params[0].Op] = v.(string)
-		}
-	} else {
-		v, k := kind(c.Params[1].Op)
-		switch k {
-		case id:
-			env.Symbols[c.Params[0].Op] = env.Symbols[v.(string)]
-		case in:
-			env.Symbols[c.Params[0].Op] = v.(int)
-		case st:
-			env.Symbols[c.Params[0].Op] = v.(string)
+func (c *Cmd) Mul(vars *Vars) interface{} {
+	var res int
+	for _, v := range c.Params{
+		if v.Params == nil {
+			r, _ := kind(v.Op)
+			res *= r.(int)
+		} else {
+			res *= v.Eval(vars).(int)
 		}
 	}
-	return env.Symbols[c.Params[0].Op]
+	return res
 }
 
-// TODO: current syntax rules makes a the second and third param of if (call anything) tp ((call anything)) which means (run (call anything))
-// Same applies to for and all "cotrol structures".
-func (c *Cmd) If(env *Env) interface{} {
-	v := c.Params[0].Eval(env)
-	var ret interface{}
-	if v.(bool) {
-		ret = c.Params[1].Eval(env)
-	} else {
-		ret = c.Params[2].Eval(env)
-	}
-	return ret
-}
-
-func (c *Cmd) Print(env *Env) interface{} {
+func (c *Cmd) Print(vars *Vars) interface{} {
 	for _, v := range c.Params {
 		val, k := kind(v.Op)
 		if k == id {
-			fmt.Print(env.Symbols[val.(string)])
+			fmt.Print(vars.Get(val.(string)))
 		} else {
-			fmt.Print(val.(string))
+			fmt.Print(val)
 		}
 	}
 	return 1
 }
 
-func (c *Cmd) Println(env *Env) interface{} {
-	c.Print(env)
+func (c *Cmd) Println(vars *Vars) interface{} {
+	c.Print(vars)
 	fmt.Print("\n")
 	return 1
 }
 
-func (c *Cmd) Read(env *Env) interface{} {
+func (c *Cmd) Read(vars *Vars) interface{} {
 		return nil
+}
+
+func (c *Cmd) Run(vars *Vars) interface{} {
+	if len(c.Params) == 1 {
+		return c.Params[0].Eval(vars)
+	}
+	l := len(c.Params)
+	for i, v := range c.Params {
+		if i == l-1 {
+			return v.Eval(vars)
+		}
+		v.Eval(vars)
+	}
+	return nil
+}
+
+func (c *Cmd) Set(vars *Vars) interface{} {
+	vname := c.Params[0].Op
+	var v interface{}
+	if c.Params[1].Params != nil {
+		v = c.Params[1].Eval(vars)
+		vars.Set(vname, v)
+	} else {
+		v, k := kind(c.Params[1].Op)
+		switch k {
+		case id:
+			vars.Set(vname, vars.Get(v.(string)))
+		default:
+			vars.Set(vname, v)
+		}
+	}
+	return v
+}
+
+func (c *Cmd) Sub(vars *Vars) interface{} {
+	var res int
+	for _, v := range c.Params{
+		if v.Params == nil {
+			r, _ := kind(v.Op)
+			res -= r.(int)
+		} else {
+			res -= v.Eval(vars).(int)
+		}
+	}
+	return res
 }
