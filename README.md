@@ -10,6 +10,7 @@ With significant whitespace and indentation, the outermost parentheses are there
 
 Everything is subject to change.
 
+### General example
 ```
 -- This is a comment
 set n (+ 2 4)
@@ -33,12 +34,13 @@ n is 6
 n is 6
 ```
 
+### Newline shorthand
 One can use the ";" as a shorthand for a newline with same indentation:
 ```
 set a 10; set b 20
 ```
 
-Function definition and call:
+### Function definition and call
 ```
 set k 10
 func l (u) (run
@@ -55,7 +57,7 @@ Produces:
 <nil>
 ```
 
-Closures are working too:
+### Closures
 ```
 func l (u) (run
 	set m 9
@@ -69,6 +71,20 @@ Produces:
 ```
 49
 59
+```
+
+### Recursion
+```
+func fib (x)
+	if (| (eq x 0) (eq x 1))
+		get x
+		+ (fib (- x 1)) (fib (- x 2))
+println (fib 15)
+```
+
+Produces:
+```
+610
 ```
 
 Goals
