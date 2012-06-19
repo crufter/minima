@@ -18,16 +18,16 @@ const(
 )
 
 var token_exrps_clear = []lexer.TokenExpr{
-    {`[ ]+`,									itemIgnore},	// Whitespace
-    {`\-\-[^\n]*`,								itemIgnore},	// Comment
-	{`\n`,										-itemNewLine},	// Newline
-	{`\t`,										-itemTab},
-	{`;`,										itemSemi},
-    {`\(`,										itemRParen},
-    {`\)`,										itemLParen},
-    {`[0-9]+`,									itemInt},
-	{`"(?:[^"\\]|\\.)*"`,						itemString},
-    {`[\<\>\!\=\+\-\*\/A-Za-z][A-Za-z0-9_]*`,	itemID},
+    {`[ ]+`,										itemIgnore},	// Whitespace
+    {`\-\-[^\n]*`,									itemIgnore},	// Comment
+	{`\n`,											-itemNewLine},	// Newline
+	{`\t`,											-itemTab},
+	{`;`,											itemSemi},
+    {`\(`,											itemRParen},
+    {`\)`,											itemLParen},
+    {`[0-9]+`,										itemInt},
+	{`"(?:[^"\\]|\\.)*"`,							itemString},
+    {`[\<\>\!\=\+\-\|\&\*\/A-Za-z][A-Za-z0-9_]*`,	itemID},
 }
 
 // This is where we handle all the new style rules, we transform to old style simply.

@@ -10,6 +10,7 @@ const(
 	st
 	fl
 	in
+	bo
 )
 
 func kind(str string) (interface{}, int) {
@@ -19,6 +20,10 @@ func kind(str string) (interface{}, int) {
 		return int(_int), in
 	} else if flo, err := strconv.ParseFloat(str, 32); err == nil {
 		return flo, fl
+	} else if str == "true" {
+		return true, bo
+	} else if str == "false" {
+		return false, bo
 	}
 	return str, id
 }
@@ -30,10 +35,12 @@ type Func struct {
 }
 
 func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars_.Lev}	// Support for recursion.
+	copy(nvar.Sym, f.Vars_.Sym)
 	for i, v := range f.Args {
-		f.Vars_.Set(v, params[i])
+		nvar.Set(v, params[i])
 	}
-	return f.Com.Eval(f.Vars_)
+	return f.Com.Eval(nvar)
 }
 
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
@@ -55,6 +62,19 @@ func (v Vars) Get(varname string) interface{} {
 	return ret
 }
 
+// Equals to = in Go.
+func (v Vars) Mod(varname string, val interface{}) {
+	for i:=v.Lev-1; i>=0 ;i-- {
+		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
+			_, ok := v.Sym[i][varname]
+			if ok {
+				v.Sym[i][varname] = val
+			}
+		}
+	}
+}
+
+// Equals to := in Go.
 func (v Vars) Set(varname string, val interface{}) {
 	if v.Sym[v.Lev-1] == nil {
 		v.Sym[v.Lev-1] = map[string]interface{}{}
@@ -67,24 +87,40 @@ type Cmd struct {
 	Params	[]*Cmd
 }
 
+// TODO: refactor code to get rid of a lot of evaling inside builtins.
+// A var should eval to it's value, a constant to a const etc...
 func (c *Cmd) Eval(vars *Vars) interface{} {
 	vars.Lev++
 	var v interface{}
 	switch c.Op {
 	case "+":
 		v = c.Add(vars)
+	case "&":
+		v = c.And(vars)
 	case "/":
 		v = c.Div(vars)
-	case "<":
-		v = c.Less(vars)
-	case "if":
-		v = c.If(vars)
+	case "eq":
+		v = c.Eq(vars)
 	case "for":
 		v = c.For(vars)
 	case "func":
 		v = c.Func(vars)
+	case "get":
+		v = c.Get(vars)
+	case "if":
+		v = c.If(vars)
+	case "<":
+		v = c.Less(vars)
+	case "list":
+		v = c.List(vars)
+	case "map":
+		v = c.Map(vars)
+	case "mod":
+		v = c.Mod(vars)
 	case "*":
 		v = c.Mul(vars)
+	case "|":
+		v = c.Or(vars)
 	case "print":
 		v = c.Print(vars)
 	case "println":
@@ -144,6 +180,33 @@ func (c *Cmd) Add(vars *Vars) interface{} {
 	return res
 }
 
+func (c *Cmd) And(vars *Vars) interface{} {
+	for _, v := range c.Params {
+		if v.Params != nil {
+			val := v.Eval(vars)
+			if value, _ := val.(bool); value == false {
+				return false
+			}
+		} else {
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				if value, _ := vars.Get(r.(string)).(bool); value == false {
+					return false
+				}
+			case bo:
+				if value, _ := r.(bool); value == false {
+					return false
+				}
+			}
+		}
+	}
+	if len(c.Params) == 0 {
+		return false
+	}
+	return true
+}
+
 func (c *Cmd) Div(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
@@ -162,17 +225,24 @@ func (c *Cmd) Div(vars *Vars) interface{} {
 	return res
 }
 
-// TODO: current syntax rules makes a the second and third param of if (call anything) tp ((call anything)) which means (run (call anything))
-// Same applies to for and all "cotrol structures".
-func (c *Cmd) If(vars *Vars) interface{} {
-	v := c.Params[0].Eval(vars)
-	var ret interface{}
-	if v.(bool) {
-		ret = c.Params[1].Eval(vars)
-	} else {
-		ret = c.Params[2].Eval(vars)
+func (c *Cmd) Eq(vars *Vars) interface{} {
+	if c.Params[0].Params == nil && c.Params[1].Params == nil {
+		v1, k1 := kind(c.Params[0].Op)
+		v2, k2 := kind(c.Params[1].Op)
+		var val1, val2 int
+		if k1 == id {
+			val1 = vars.Get(v1.(string)).(int)
+		} else {
+			val1 = v1.(int)
+		}
+		if k2 == id {
+			val2 = vars.Get(v2.(string)).(int)
+		} else {
+			val2 = v2.(int)
+		}
+		return val1 == val2
 	}
-	return ret
+	return false
 }
 
 func (c *Cmd) For(vars *Vars) interface{} {
@@ -192,7 +262,6 @@ func (c *Cmd) For(vars *Vars) interface{} {
 	return nil
 }
 
-// Current imlementation will leak memory.
 func (c *Cmd) Func(vars *Vars) interface{} {
 	var name string
 	co := 0
@@ -202,7 +271,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	} else {
 		name = "lambda"
 	}
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev+1}	// TODO: think about the Lev+1 later.
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars_: nvar}
 	if len(c.Params) == co + 2 {		// Has parameters.
@@ -215,7 +284,35 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	}
 	f.Com = c.Params[co]
 	vars.Set(name, f)					// Not sure if it will be kept.
+	f.Vars_.Set(name, f)
+	f.Vars_.Lev++
+	// TODO: think about the possible inconsistency what a nils cause when we imagine vars as a []map[string]interface{} in terms of references.
+	// For example: x := make(map[string]interface{}, 10); copying it to a new slice and Vars.Setting variables assuming that both will updated will only work
+	// if the maps are already existing and not nil.
 	return f
+}
+
+func (c *Cmd) Get(vars *Vars) interface{} {
+	val, _ := kind(c.Params[0].Op)
+	return vars.Get(val.(string))
+}
+
+// TODO: current syntax rules makes a the second and third param of if (call anything) tp ((call anything)) which means (run (call anything))
+// Same applies to for and all "cotrol structures".
+func (c *Cmd) If(vars *Vars) interface{} {
+	v := c.Params[0].Eval(vars)
+	var ret interface{}
+	if v.(bool) {
+		if c.Params[1].Params != nil {
+			ret = c.Params[1].Eval(vars)
+		} else {
+			val, _ := kind(c.Params[1].Op)
+			ret = vars.Get(val.(string))
+		}
+	} else if len(c.Params) > 2 {
+		ret = c.Params[2].Eval(vars)
+	}
+	return ret
 }
 
 func (c *Cmd) Less(vars *Vars) interface{} {
@@ -238,6 +335,32 @@ func (c *Cmd) Less(vars *Vars) interface{} {
 	return false
 }
 
+func (c *Cmd) List(vars *Vars) interface{} {
+	return nil
+}
+
+func (c *Cmd) Map(vars *Vars) interface{} {
+	return nil
+}
+
+func (c *Cmd) Mod(vars *Vars) interface{} {
+	vname := c.Params[0].Op
+	var v interface{}
+	if c.Params[1].Params != nil {
+		v = c.Params[1].Eval(vars)
+		vars.Mod(vname, v)
+	} else {
+		v, k := kind(c.Params[1].Op)
+		switch k {
+		case id:
+			vars.Mod(vname, vars.Get(v.(string)))
+		default:
+			vars.Mod(vname, v)
+		}
+	}
+	return v
+}
+
 func (c *Cmd) Mul(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
@@ -254,6 +377,30 @@ func (c *Cmd) Mul(vars *Vars) interface{} {
 		}
 	}
 	return res
+}
+
+func (c *Cmd) Or(vars *Vars) interface{} {
+	for _, v := range c.Params {
+		if v.Params != nil {
+			val := v.Eval(vars)
+			if value, _ := val.(bool); value == true {
+				return true
+			}
+		} else {
+			r, kin := kind(v.Op)
+			switch kin {
+			case id:
+				if value, _ := vars.Get(r.(string)).(bool); value == true {
+					return true
+				}
+			case bo:
+				if value, _ := r.(bool); value == true {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (c *Cmd) Print(vars *Vars) interface{} {
@@ -316,18 +463,26 @@ func (c *Cmd) Set(vars *Vars) interface{} {
 
 func (c *Cmd) Sub(vars *Vars) interface{} {
 	var res int
+	first := true
 	for _, v := range c.Params{
+		var va int
 		if v.Params == nil {
 			r, kin := kind(v.Op)
 			switch kin {
 			case id:
-				res -= vars.Get(r.(string)).(int)
+				va = vars.Get(r.(string)).(int)
 			case in:
-				res -= r.(int)
+				va = r.(int)
 			}
 		} else {
-			res -= v.Eval(vars).(int)
+			va = v.Eval(vars).(int)
 		}
+		if first {
+			res = va
+		} else {
+			res -= va
+		}
+		first = false
 	}
 	return res
 }

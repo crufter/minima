@@ -31,11 +31,6 @@ n is smaller than 8
 n is 6
 n is 6
 n is 6
-n is 6
-n is 6
-n is 6
-n is 6
-n is 6
 ```
 
 One can use the ";" as a shorthand for a newline with same indentation:
@@ -78,11 +73,13 @@ Produces:
 
 Goals
 ======
-- Create a language in pure Go
+- Create a language in pure Go.
 - Create a scripting language which is statically typed.
 
 Latest additions
 ======
+- Better recursion support.
+- Eq, |, & operators.
 - Variable scoping, functions, closures.
 
 Roadmap

@@ -9,7 +9,7 @@ import(
 var oldstyle =
 `
 -- This is a comment.
-(set n (+ 2 4))
+(set n (+ 2 1))
 (set x 8)
 (if (< n x)
 	(run
@@ -21,7 +21,7 @@ var oldstyle =
 var newstyle =
 `
 -- This is a comment
-set n (+ 2 4)
+set n (+ 2 1)
 set x 8
 if (< n x)
 	run
