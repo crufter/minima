@@ -138,20 +138,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 			fun := vars.Get(c.Op)
 			if val, k := fun.(Func); k {
 				params := []interface{}{}
-				for _, v := range c.Params {
-					var ap interface{}
-					if v.Params == nil {
-						pval, kind := kind(v.Op)
-						switch kind {
-						case id:
-							ap = vars.Get(pval.(string))
-						default:
-							ap = pval
-						}
-					} else {
-						ap = v.Eval(vars)
-					}
-					params = append(params, ap)
+				for _, va := range c.Params {
+					params = append(params, va.Eval(vars))
 				}
 				v = val.Eval(vars, params)
 			} else {
