@@ -90,115 +90,101 @@ type Cmd struct {
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
 // A var should eval to it's value, a constant to a const etc...
 func (c *Cmd) Eval(vars *Vars) interface{} {
-	vars.Lev++
 	var v interface{}
-	switch c.Op {
-	case "+":
-		v = c.Add(vars)
-	case "&":
-		v = c.And(vars)
-	case "/":
-		v = c.Div(vars)
-	case "eq":
-		v = c.Eq(vars)
-	case "for":
-		v = c.For(vars)
-	case "func":
-		v = c.Func(vars)
-	case "get":
-		v = c.Get(vars)
-	case "if":
-		v = c.If(vars)
-	case "<":
-		v = c.Less(vars)
-	case "list":
-		v = c.List(vars)
-	case "map":
-		v = c.Map(vars)
-	case "mod":
-		v = c.Mod(vars)
-	case "*":
-		v = c.Mul(vars)
-	case "|":
-		v = c.Or(vars)
-	case "print":
-		v = c.Print(vars)
-	case "println":
-		v = c.Println(vars)
-	case "read":
-		v = c.Read(vars)
-	case "run":
-		v = c.Run(vars)
-	case "set":
-		v = c.Set(vars)
-	case "-":
-		v = c.Sub(vars)
-	default:			// Not builtin function call.
-		fun := vars.Get(c.Op)
-		if val, k := fun.(Func); k {
-			params := []interface{}{}
-			for _, v := range c.Params {
-				var ap interface{}
-				if v.Params == nil {
-					pval, kind := kind(v.Op)
-					switch kind {
-					case id:
-						ap = vars.Get(pval.(string))
-					default:
-						ap = pval
+	if c.Params != nil {
+		vars.Lev++
+		switch c.Op {
+		case "+":
+			v = c.Add(vars)
+		case "&":
+			v = c.And(vars)
+		case "/":
+			v = c.Div(vars)
+		case "eq":
+			v = c.Eq(vars)
+		case "for":
+			v = c.For(vars)
+		case "func":
+			v = c.Func(vars)
+		case "get":
+			v = c.Get(vars)
+		case "if":
+			v = c.If(vars)
+		case "<":
+			v = c.Less(vars)
+		case "list":
+			v = c.List(vars)
+		case "map":
+			v = c.Map(vars)
+		case "mod":
+			v = c.Mod(vars)
+		case "*":
+			v = c.Mul(vars)
+		case "|":
+			v = c.Or(vars)
+		case "print":
+			v = c.Print(vars)
+		case "println":
+			v = c.Println(vars)
+		case "read":
+			v = c.Read(vars)
+		case "run":
+			v = c.Run(vars)
+		case "set":
+			v = c.Set(vars)
+		case "-":
+			v = c.Sub(vars)
+		default:			// Not builtin function call.
+			fun := vars.Get(c.Op)
+			if val, k := fun.(Func); k {
+				params := []interface{}{}
+				for _, v := range c.Params {
+					var ap interface{}
+					if v.Params == nil {
+						pval, kind := kind(v.Op)
+						switch kind {
+						case id:
+							ap = vars.Get(pval.(string))
+						default:
+							ap = pval
+						}
+					} else {
+						ap = v.Eval(vars)
 					}
-				} else {
-					ap = v.Eval(vars)
+					params = append(params, ap)
 				}
-				params = append(params, ap)
+				v = val.Eval(vars, params)
+			} else {
+				panic("Call of non-function " + c.Op)
 			}
-			v = val.Eval(vars, params)
-		} else {
-			panic("Call of non-function " + c.Op)
+		}
+		vars.Sym[vars.Lev] = nil
+		vars.Lev--
+	} else {
+		val, ki := kind(c.Op)
+		switch ki {
+		case id:
+			v = vars.Get(val.(string))
+		default:
+			v = val
 		}
 	}
-	vars.Sym[vars.Lev] = nil
-	vars.Lev--
 	return v
 }
 
 func (c *Cmd) Add(vars *Vars) interface{} {
 	var res int
 	for _, v := range c.Params{
-		if v.Params == nil {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				res += vars.Get(r.(string)).(int)
-			case in:
-				res += r.(int)
-			}
-		} else {
-			res += v.Eval(vars).(int)
-		}
+		res += v.Eval(vars).(int)
 	}
 	return res
 }
 
 func (c *Cmd) And(vars *Vars) interface{} {
 	for _, v := range c.Params {
-		if v.Params != nil {
-			val := v.Eval(vars)
-			if value, _ := val.(bool); value == false {
-				return false
-			}
-		} else {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				if value, _ := vars.Get(r.(string)).(bool); value == false {
-					return false
-				}
-			case bo:
-				if value, _ := r.(bool); value == false {
-					return false
-				}
-			}
+		val := v.Eval(vars)
+		if value, _ := val.(bool); value == false {
+			return false
 		}
 	}
 	if len(c.Params) == 0 {
@@ -208,41 +194,15 @@ func (c *Cmd) And(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Div(vars *Vars) interface{} {
-	var res int
-	for _, v := range c.Params{
-		if v.Params == nil {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				res /= vars.Get(r.(string)).(int)
-			case in:
-				res /= r.(int)
-			}
-		} else {
-			res /= v.Eval(vars).(int)
-		}
+	res := c.Params[0].Eval(vars).(int)
+	for i:=1; i<len(c.Params); i++ {
+		res /= c.Params[i].Eval(vars).(int)
 	}
 	return res
 }
 
 func (c *Cmd) Eq(vars *Vars) interface{} {
-	if c.Params[0].Params == nil && c.Params[1].Params == nil {
-		v1, k1 := kind(c.Params[0].Op)
-		v2, k2 := kind(c.Params[1].Op)
-		var val1, val2 int
-		if k1 == id {
-			val1 = vars.Get(v1.(string)).(int)
-		} else {
-			val1 = v1.(int)
-		}
-		if k2 == id {
-			val2 = vars.Get(v2.(string)).(int)
-		} else {
-			val2 = v2.(int)
-		}
-		return val1 == val2
-	}
-	return false
+	return c.Params[0].Eval(vars).(int) == c.Params[1].Eval(vars).(int)
 }
 
 func (c *Cmd) For(vars *Vars) interface{} {
@@ -303,12 +263,7 @@ func (c *Cmd) If(vars *Vars) interface{} {
 	v := c.Params[0].Eval(vars)
 	var ret interface{}
 	if v.(bool) {
-		if c.Params[1].Params != nil {
-			ret = c.Params[1].Eval(vars)
-		} else {
-			val, _ := kind(c.Params[1].Op)
-			ret = vars.Get(val.(string))
-		}
+		ret = c.Params[1].Eval(vars)
 	} else if len(c.Params) > 2 {
 		ret = c.Params[2].Eval(vars)
 	}
@@ -316,23 +271,7 @@ func (c *Cmd) If(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Less(vars *Vars) interface{} {
-	if c.Params[0].Params == nil && c.Params[1].Params == nil {
-		v1, k1 := kind(c.Params[0].Op)
-		v2, k2 := kind(c.Params[1].Op)
-		var val1, val2 int
-		if k1 == id {
-			val1 = vars.Get(v1.(string)).(int)
-		} else {
-			val1 = v1.(int)
-		}
-		if k2 == id {
-			val2 = vars.Get(v2.(string)).(int)
-		} else {
-			val2 = v2.(int)
-		}
-		return val1 < val2
-	}
-	return false
+	return c.Params[0].Eval(vars).(int) < c.Params[1].Eval(vars).(int)
 }
 
 func (c *Cmd) List(vars *Vars) interface{} {
@@ -346,58 +285,24 @@ func (c *Cmd) Map(vars *Vars) interface{} {
 func (c *Cmd) Mod(vars *Vars) interface{} {
 	vname := c.Params[0].Op
 	var v interface{}
-	if c.Params[1].Params != nil {
-		v = c.Params[1].Eval(vars)
-		vars.Mod(vname, v)
-	} else {
-		v, k := kind(c.Params[1].Op)
-		switch k {
-		case id:
-			vars.Mod(vname, vars.Get(v.(string)))
-		default:
-			vars.Mod(vname, v)
-		}
-	}
+	v = c.Params[1].Eval(vars)
+	vars.Mod(vname, v)
 	return v
 }
 
 func (c *Cmd) Mul(vars *Vars) interface{} {
-	var res int
+	res := 1
 	for _, v := range c.Params{
-		if v.Params == nil {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				res *= vars.Get(r.(string)).(int)
-			case in:
-				res *= r.(int)
-			}
-		} else {
-			res *= v.Eval(vars).(int)
-		}
+		res *= v.Eval(vars).(int)
 	}
 	return res
 }
 
 func (c *Cmd) Or(vars *Vars) interface{} {
 	for _, v := range c.Params {
-		if v.Params != nil {
-			val := v.Eval(vars)
-			if value, _ := val.(bool); value == true {
-				return true
-			}
-		} else {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				if value, _ := vars.Get(r.(string)).(bool); value == true {
-					return true
-				}
-			case bo:
-				if value, _ := r.(bool); value == true {
-					return true
-				}
-			}
+		val := v.Eval(vars)
+		if value, _ := val.(bool); value == true {
+			return true
 		}
 	}
 	return false
@@ -405,16 +310,7 @@ func (c *Cmd) Or(vars *Vars) interface{} {
 
 func (c *Cmd) Print(vars *Vars) interface{} {
 	for _, v := range c.Params {
-		if v.Params != nil {
-			fmt.Print(v.Eval(vars))
-		} else {
-			val, k := kind(v.Op)
-			if k == id {
-				fmt.Print(vars.Get(val.(string)))
-			} else {
-				fmt.Print(val)
-			}
-		}
+		fmt.Print(v.Eval(vars))
 	}
 	return 1
 }
@@ -446,18 +342,8 @@ func (c *Cmd) Run(vars *Vars) interface{} {
 func (c *Cmd) Set(vars *Vars) interface{} {
 	vname := c.Params[0].Op
 	var v interface{}
-	if c.Params[1].Params != nil {
-		v = c.Params[1].Eval(vars)
-		vars.Set(vname, v)
-	} else {
-		v, k := kind(c.Params[1].Op)
-		switch k {
-		case id:
-			vars.Set(vname, vars.Get(v.(string)))
-		default:
-			vars.Set(vname, v)
-		}
-	}
+	v = c.Params[1].Eval(vars)
+	vars.Set(vname, v)
 	return v
 }
 
@@ -465,18 +351,7 @@ func (c *Cmd) Sub(vars *Vars) interface{} {
 	var res int
 	first := true
 	for _, v := range c.Params{
-		var va int
-		if v.Params == nil {
-			r, kin := kind(v.Op)
-			switch kin {
-			case id:
-				va = vars.Get(r.(string)).(int)
-			case in:
-				va = r.(int)
-			}
-		} else {
-			va = v.Eval(vars).(int)
-		}
+		va := v.Eval(vars).(int)
 		if first {
 			res = va
 		} else {
