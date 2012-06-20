@@ -11,7 +11,7 @@ With significant whitespace and indentation, the outermost parentheses are there
 Everything is subject to change.
 
 ### General example
-```
+```go
 -- This is a comment
 set n (+ 2 1)
 set x 8
@@ -36,12 +36,12 @@ n is 3
 
 ### Newline shorthand
 One can use the ";" as a shorthand for a newline with same indentation:
-```
+```go
 set a 10; set b 20
 ```
 
 ### Function definition and call
-```
+```go
 set k 10
 func l (u) (run
 	println k
@@ -58,7 +58,7 @@ Produces:
 ```
 
 ### Closures
-```
+```go
 func l (u) (run
 	set m 9
 	func (v) (+ v u m))
@@ -74,7 +74,7 @@ Produces:
 ```
 
 ### Recursion
-```
+```go
 func fib (x)
 	if (| (eq x 0) (eq x 1))
 		get x
@@ -88,7 +88,7 @@ Produces:
 ```
 
 ### Panic/recover
-```
+```go
 func k (panic "OMG")
 func f (run
 	recover (run(println "Recovering from " prob) (+ 1 1))
@@ -115,7 +115,7 @@ Recovered
 ```
 
 ### Defer
-```
+```go
 func f (run
 	defer (println 0)
 	defer (println 1)
