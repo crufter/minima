@@ -28,24 +28,28 @@ func kind(str string) (interface{}, int) {
 	return str, id
 }
 
-type Recover struct {
-	
-}
-
 type Func struct {
-	Vars_ 	*Vars
+	Vars 	*Vars
 	Args 	[]string
 	Com 	*Cmd
-	Recover	*Recover
+	Recover	*Cmd
+	Defers	[]*Cmd
 }
 
 func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars_.Lev, Jump:f.Vars_.Jump}	// Support for recursion.
-	copy(nvar.Sym, f.Vars_.Sym)
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
+	copy(nvar.Sym, f.Vars.Sym)
 	for i, v := range f.Args {
 		nvar.Set(v, params[i])
 	}
-	return f.Com.Eval(nvar)
+	v := f.Com.Eval(nvar)
+	if f.Vars.Jump.Type == 2 {	// Panic
+		// Think again about attaching a recover to a given Func. Recover command runs every time but it is unnecessary after the first evaluation.
+		// Also think about the ugliness of writing data into the Func.
+		f.Vars.Jump.Type = 0
+		return f.Recover.Eval(nvar)
+	}
+	return v
 }
 
 type Break struct {
@@ -105,6 +109,8 @@ func (v Vars) Set(varname string, val interface{}) {
 type Cmd struct {
 	Op string
 	Params	[]*Cmd
+	ParentCmd *Cmd				// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
+	ParentFunc *Func			// 
 }
 
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
@@ -122,6 +128,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		case "&":
 			v = c.And(vars)
 		case "break":
+			v = c.Break(vars)
+		case "defer":
 			v = c.Break(vars)
 		case "/":
 			v = c.Div(vars)
@@ -155,6 +163,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 			v = c.Println(vars)
 		case "read":
 			v = c.Read(vars)
+		case "recover":
+			v = c.Recover(vars)
 		case "run":
 			v = c.Run(vars)
 		case "set":
@@ -163,7 +173,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 			v = c.Sub(vars)
 		default:			// Not builtin function call.
 			fun := vars.Get(c.Op)
-			if val, k := fun.(Func); k {
+			if val, k := fun.(*Func); k {
 				params := []interface{}{}
 				for _, va := range c.Params {
 					params = append(params, va.Eval(vars))
@@ -222,6 +232,11 @@ func (c *Cmd) Break(vars *Vars) interface{} {
 	return nil
 }
 
+func (c *Cmd) Defer(vars *Vars) interface{} {
+	
+	return nil
+}
+
 func (c *Cmd) Div(vars *Vars) interface{} {
 	res := c.Params[0].Eval(vars).(int)
 	for i:=1; i<len(c.Params); i++ {
@@ -277,7 +292,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	}
 	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
-	f := Func{Vars_: nvar}
+	f := Func{Vars: nvar}
 	if len(c.Params) == co + 2 {		// Has parameters.
 		args := []string{c.Params[co].Op}
 		for _, v := range c.Params[co].Params {
@@ -287,9 +302,10 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 		co++
 	}
 	f.Com = c.Params[co]
-	vars.Set(name, f)					// Not sure if it will be kept.
-	f.Vars_.Set(name, f)
-	f.Vars_.Lev++
+	c.Params[co].ParentFunc = &f				// To support panics.
+	vars.Set(name, &f)							// Not sure if it will be kept.
+	f.Vars.Set(name, &f)
+	f.Vars.Lev++
 	// TODO: think about the possible inconsistency what a nils cause when we imagine vars as a []map[string]interface{} in terms of references.
 	// For example: x := make(map[string]interface{}, 10); copying it to a new slice and Vars.Setting variables assuming that both will updated will only work
 	// if the maps are already existing and not nil.
@@ -308,7 +324,7 @@ func (c *Cmd) If(vars *Vars) interface{} {
 	var ret interface{}
 	if v.(bool) {
 		ret = c.Params[1].Eval(vars)
-	} else if len(c.Params) > 2 {
+	} else if len(c.Params) > 2 && vars.Jump.Type == 0 {
 		ret = c.Params[2].Eval(vars)
 	}
 	return ret
@@ -384,12 +400,30 @@ func (c *Cmd) Read(vars *Vars) interface{} {
 		return nil
 }
 
+func (c *Cmd) Recover(vars *Vars) interface{} {
+	p := c
+	for {
+		if p.ParentFunc != nil {
+			p.ParentFunc.Recover = c.Params[0]
+			break
+		}
+		if p.ParentCmd == nil {
+			break
+		}
+		p = p.ParentCmd
+	}
+	return nil
+}
+
 func (c *Cmd) Run(vars *Vars) interface{} {
 	if len(c.Params) == 1 {
 		return c.Params[0].Eval(vars)
 	}
 	l := len(c.Params)
 	for i, v := range c.Params {
+		if vars.Jump.Type != 0 {
+			return nil
+		}
 		if i == l-1 {
 			return v.Eval(vars)
 		}

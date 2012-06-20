@@ -16,7 +16,7 @@ var oldstyle =
 		(println "Multiline if.")
 		(println "n is smaller than " x))
 	(println "n is greater or equal than " x))
-(for x (println "n is " n))
+(for n (println "n is " n))
 `
 var newstyle =
 `
@@ -28,7 +28,7 @@ if (< n x)
 		println "Multiline if."
 		println "n is smaller than " x
 	println "n is greater or equal than " x
-for x
+for n
 	println "n is " n
 `
 

@@ -13,14 +13,14 @@ Everything is subject to change.
 ### General example
 ```
 -- This is a comment
-set n (+ 2 4)
+set n (+ 2 1)
 set x 8
 if (< n x)
 	run
 		println "Multiline if."
 		println "n is smaller than " x
 	println "n is greater or equal than " x
-for x
+for n
 	println "n is " n
 ```
 
