@@ -454,6 +454,9 @@ func (c *Cmd) Run(vars *Vars) interface{} {
 	l := len(c.Params)
 	for i, v := range c.Params {
 		if vars.Jump.Type != 0 {
+			if vars.Jump.Type == 2 && c.ParentCmd == nil {
+				panic(vars.Jump.Dat.(*Panic).Reason)
+			}
 			return nil
 		}
 		if i == l-1 {

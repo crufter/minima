@@ -17,7 +17,6 @@ for x
 			mod i (+ i 1)
 			println "i is not 10 yet"
 println "after break, i is " i
-panic "wtf"
 println "deep break"
 for 6
 	for 9
