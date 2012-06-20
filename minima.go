@@ -180,6 +180,9 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 				}
 				v = val.Eval(vars, params)
 			} else {
+				if _, isF := fun.(Func); isF {
+					panic("Somewhere there is a Func set instead of *Func, name: " + c.Op)
+				}
 				panic("Call of non-function " + c.Op)
 			}
 		}
@@ -309,7 +312,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	// TODO: think about the possible inconsistency what a nils cause when we imagine vars as a []map[string]interface{} in terms of references.
 	// For example: x := make(map[string]interface{}, 10); copying it to a new slice and Vars.Setting variables assuming that both will updated will only work
 	// if the maps are already existing and not nil.
-	return f
+	return &f		// f instead of &f was a source of "Somewhere..." etc panic
 }
 
 func (c *Cmd) Get(vars *Vars) interface{} {
