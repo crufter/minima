@@ -29,9 +29,9 @@ This above snippet will produce:
 ```
 Multiline if.
 n is smaller than 8
-n is 6
-n is 6
-n is 6
+n is 3
+n is 3
+n is 3
 ```
 
 ### Newline shorthand
