@@ -87,6 +87,49 @@ Produces:
 610
 ```
 
+### Panic/recover
+```
+func k (panic "OMG")
+func f (run
+	recover (run(println "Recovering from " prob) (+ 1 1))
+	println "Panicking in next function call."
+	k
+	println "This shall not run.")
+func l (run
+	println "Just a casual println..."
+	set ret (f)
+	println "This shall run."
+	get ret)
+println (l)
+println "Recovered"
+```
+
+Produces:
+```
+Just a casual println...
+Panicking in next function call.
+Recovering from OMG
+This shall run.
+2
+Recovered
+```
+
+### Defer
+```
+func f (run
+	defer (println 0)
+	defer (println 1)
+	println "This shall run before the deferred functions.")
+f
+```
+
+Produces:
+```
+This shall run before the deferred functions.
+1
+0
+```
+
 Goals
 ======
 - Create a language in pure Go.
@@ -94,12 +137,15 @@ Goals
 
 Latest additions
 ======
+- Defer
+- Panic/Recover
 - Better recursion support.
 - Eq, |, & operators.
 - Variable scoping, functions, closures.
 
 Roadmap
 ======
+- Defer
 - []interface{} and map[string]interface{} types to be able to handle JSON data.
 - More syntactic sugar (expect some neat things here).
 - More builtin goodies.

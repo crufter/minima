@@ -43,14 +43,26 @@ func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
 		nvar.Set(v, params[i])
 	}
 	v := f.Com.Eval(nvar)
+	recovered := false
 	if f.Vars.Jump.Type == 2 && f.Recover != nil {	// Panic
+		recovered = true
 		// Think again about attaching a recover to a given Func. Recover command runs every time but it is unnecessary after the first evaluation.
 		// Also think about the ugliness of writing data into the Func.
 		f.Vars.Jump.Type = 0
-		nvar.Lev++	// Hack to inject local var.
+		nvar.Lev++	// Hack to inject local var into recover.
 		nvar.Set("prob", f.Vars.Jump.Dat.(*Panic).Reason)
 		nvar.Lev--
-		return f.Recover.Eval(nvar)
+		v = f.Recover.Eval(nvar)
+	}
+	if f.Defers != nil {
+		for _, com := range f.Defers {
+			if recovered {
+				nvar.Lev++	// Hack to inject local var into refers.
+				nvar.Set("prob", f.Vars.Jump.Dat.(*Panic).Reason)
+				nvar.Lev--
+			}
+			com.Eval(nvar)
+		}
 	}
 	return v
 }
@@ -133,7 +145,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		case "break":
 			v = c.Break(vars)
 		case "defer":
-			v = c.Break(vars)
+			v = c.Defer(vars)
 		case "/":
 			v = c.Div(vars)
 		case "eq":
@@ -239,7 +251,21 @@ func (c *Cmd) Break(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Defer(vars *Vars) interface{} {
-	
+	p := c
+	for {
+		if p.ParentFunc != nil {
+			if p.ParentFunc.Defers == nil {
+				p.ParentFunc.Defers = []*Cmd{c.Params[0]}
+			} else {
+				p.ParentFunc.Defers = append([]*Cmd{c.Params[0]}, p.ParentFunc.Defers...)
+			}
+			break
+		}
+		if p.ParentCmd == nil {
+			break
+		}
+		p = p.ParentCmd
+	}
 	return nil
 }
 
