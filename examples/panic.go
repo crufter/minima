@@ -8,11 +8,17 @@ import(
 
 var src =
 `
-func l (run
-	recover (+ 1 1)
-	println "Just a casual println..."
-	panic "Get out of here."
+func k (panic "OMG")
+func f (run
+	recover (run(println "Recovering from " prob) (+ 1 1))
+	println "Panicking in next function call."
+	k
 	println "This shall not run.")
+func l (run
+	println "Just a casual println..."
+	set ret (f)
+	println "This shall run."
+	get ret)
 println (l)
 println "Recovered"
 `

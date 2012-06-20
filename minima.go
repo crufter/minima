@@ -43,10 +43,13 @@ func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
 		nvar.Set(v, params[i])
 	}
 	v := f.Com.Eval(nvar)
-	if f.Vars.Jump.Type == 2 {	// Panic
+	if f.Vars.Jump.Type == 2 && f.Recover != nil {	// Panic
 		// Think again about attaching a recover to a given Func. Recover command runs every time but it is unnecessary after the first evaluation.
 		// Also think about the ugliness of writing data into the Func.
 		f.Vars.Jump.Type = 0
+		nvar.Lev++	// Hack to inject local var.
+		nvar.Set("prob", f.Vars.Jump.Dat.(*Panic).Reason)
+		nvar.Lev--
 		return f.Recover.Eval(nvar)
 	}
 	return v
