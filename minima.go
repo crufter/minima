@@ -28,14 +28,19 @@ func kind(str string) (interface{}, int) {
 	return str, id
 }
 
+type Recover struct {
+	
+}
+
 type Func struct {
-	Vars_ *Vars
-	Args []string
-	Com *Cmd
+	Vars_ 	*Vars
+	Args 	[]string
+	Com 	*Cmd
+	Recover	*Recover
 }
 
 func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars_.Lev}	// Support for recursion.
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars_.Lev, Jump:f.Vars_.Jump}	// Support for recursion.
 	copy(nvar.Sym, f.Vars_.Sym)
 	for i, v := range f.Args {
 		nvar.Set(v, params[i])
@@ -43,10 +48,25 @@ func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
 	return f.Com.Eval(nvar)
 }
 
+type Break struct {
+	Lev		int
+	RetVal 	interface{}
+}
+
+type Panic struct {
+	Reason	string
+}
+
+type Jump struct {
+	Type	int		// 0 Nothing 1 Break 2 Exc
+	Dat	interface{}
+}
+
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
 type Vars struct {
-	Sym []map[string]interface{}
-	Lev int
+	Sym 	[]map[string]interface{}
+	Lev 	int
+	Jump	*Jump
 }
 
 func (v Vars) Get(varname string) interface{} {
@@ -90,6 +110,9 @@ type Cmd struct {
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
 // A var should eval to it's value, a constant to a const etc...
 func (c *Cmd) Eval(vars *Vars) interface{} {
+	if vars.Jump.Type != 0 {
+		return nil
+	}
 	var v interface{}
 	if c.Params != nil {
 		vars.Lev++
@@ -98,6 +121,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 			v = c.Add(vars)
 		case "&":
 			v = c.And(vars)
+		case "break":
+			v = c.Break(vars)
 		case "/":
 			v = c.Div(vars)
 		case "eq":
@@ -122,6 +147,8 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 			v = c.Mul(vars)
 		case "|":
 			v = c.Or(vars)
+		case "panic":
+			v = c.Panic(vars)
 		case "print":
 			v = c.Print(vars)
 		case "println":
@@ -181,6 +208,20 @@ func (c *Cmd) And(vars *Vars) interface{} {
 	return true
 }
 
+func (c *Cmd) Break(vars *Vars) interface{} {
+	b := &Break{Lev:1}
+	l := len(c.Params)
+	if l == 2 {
+		b.RetVal = c.Params[1].Eval(vars)
+	}
+	if l == 1 {
+		b.Lev = c.Params[0].Eval(vars).(int)
+	}
+	vars.Jump.Type = 1
+	vars.Jump.Dat = b
+	return nil
+}
+
 func (c *Cmd) Div(vars *Vars) interface{} {
 	res := c.Params[0].Eval(vars).(int)
 	for i:=1; i<len(c.Params); i++ {
@@ -202,6 +243,21 @@ func (c *Cmd) For(vars *Vars) interface{} {
 		val = vars.Get(v.(string)).(int)
 	}
 	for i:=0;i<val;i++{
+		if vars.Jump.Type != 0 {
+			if vars.Jump.Type == 1 {
+				b, _ := vars.Jump.Dat.(*Break)
+				if b.Lev == 1 {
+					vars.Jump.Type = 0
+					vars.Jump.Dat = nil
+					return b.RetVal
+				} else {
+					b.Lev--
+					return nil
+				}
+			} else {
+				return nil
+			}
+		}
 		if i == val-1 {
 			return c.Params[1].Eval(vars)
 		}
@@ -219,7 +275,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	} else {
 		name = "lambda"
 	}
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev}	// TODO: think about the Lev+1 later.
+	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars_: nvar}
 	if len(c.Params) == co + 2 {		// Has parameters.
@@ -296,17 +352,32 @@ func (c *Cmd) Or(vars *Vars) interface{} {
 	return false
 }
 
-func (c *Cmd) Print(vars *Vars) interface{} {
-	for _, v := range c.Params {
-		fmt.Print(v.Eval(vars))
+func (c *Cmd) Panic(vars *Vars) interface{} {
+	p := &Panic{}
+	if len(c.Params) == 1 {
+		p.Reason = c.Params[0].Eval(vars).(string)
 	}
-	return 1
+	vars.Jump.Type = 2
+	vars.Jump.Dat = p
+	return nil
+}
+
+func (c *Cmd) Print(vars *Vars) interface{} {
+	l := len(c.Params)
+	for i, v := range c.Params {
+		val := v.Eval(vars)
+		fmt.Print(val)
+		if i == l - 1 {
+			return val
+		}
+	}
+	return nil
 }
 
 func (c *Cmd) Println(vars *Vars) interface{} {
-	c.Print(vars)
+	v := c.Print(vars)
 	fmt.Print("\n")
-	return 1
+	return v
 }
 
 func (c *Cmd) Read(vars *Vars) interface{} {
