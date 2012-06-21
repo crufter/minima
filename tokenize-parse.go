@@ -47,7 +47,8 @@ func Tokenize(source string) []string {
 	tokens, _ := lexer.Lex("(\n" + source + "\n)" , token_exrps_clear)
 	toks := []string{}
 	last_ind := 0
-	for i, v := range tokens {
+	for i := 0; i<len(tokens);i++ {
+		v := tokens[i]
 		if v.Text == "\n" {
 			var next_ind int
 			if tokens[i+1].Text != "\t" {
