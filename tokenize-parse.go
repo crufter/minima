@@ -30,9 +30,21 @@ var token_exrps_clear = []lexer.TokenExpr{
     {`[\<\>\!\=\+\-\|\&\*\/A-Za-z][A-Za-z0-9_]*`,	itemID},
 }
 
+// From beginning or end of source.
+func clearNewlines(src string) string {
+	if string(src[0]) == "\n" {
+		src = src[1:]
+	}
+	if string(src[len(src)-1]) == "\n" {
+		src = src[:len(src)-1]
+	}
+	return src
+}
+
 // This is where we handle all the new style rules, we transform to old style simply.
 func Tokenize(source string) []string {
-	tokens, _ := lexer.Lex("\n(" + source + ")", token_exrps_clear)
+	source = clearNewlines(source)
+	tokens, _ := lexer.Lex("(\n" + source + "\n)" , token_exrps_clear)
 	toks := []string{}
 	last_ind := 0
 	for i, v := range tokens {
