@@ -13,6 +13,11 @@ const(
 	bo
 )
 
+const (
+	panic_varname = "prob"
+	max_depth = 50
+)
+
 func kind(str string) (interface{}, int) {
 	if len(str) > 2  && string(str[0]) == `"` && string(str[len(str)-1]) == `"` {
 		return str[1:len(str)-1], st
@@ -37,7 +42,7 @@ type Func struct {
 }
 
 func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
+	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
 	copy(nvar.Sym, f.Vars.Sym)
 	for i, v := range f.Args {
 		nvar.Set(v, params[i])
@@ -50,7 +55,7 @@ func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
 		// Also think about the ugliness of writing data into the Func.
 		f.Vars.Jump.Type = 0
 		nvar.Lev++	// Hack to inject local var into recover.
-		nvar.Set("prob", f.Vars.Jump.Dat.(*Panic).Reason)
+		nvar.Set(panic_varname, f.Vars.Jump.Dat.(*Panic).Reason)
 		nvar.Lev--
 		v = f.Recover.Eval(nvar)
 	}
@@ -58,7 +63,7 @@ func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
 		for _, com := range f.Defers {
 			if recovered {
 				nvar.Lev++	// Hack to inject local var into refers.
-				nvar.Set("prob", f.Vars.Jump.Dat.(*Panic).Reason)
+				nvar.Set(panic_varname, f.Vars.Jump.Dat.(*Panic).Reason)
 				nvar.Lev--
 			}
 			com.Eval(nvar)
@@ -122,10 +127,95 @@ func (v Vars) Set(varname string, val interface{}) {
 }
 
 type Cmd struct {
-	Op string
-	Params	[]*Cmd
-	ParentCmd *Cmd				// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
-	ParentFunc *Func			// 
+	Op 			string
+	Builtin		int
+	Params		[]*Cmd
+	ParentCmd 	*Cmd			// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
+	ParentFunc 	*Func			// 
+}
+
+// Half ugly optimization (doesn't help much btw, maybe 10-25% and more consistent performance.)
+var builtins = [...]func(*Cmd, *Vars)interface{}{
+	(*Cmd).Add       ,
+	(*Cmd).And       ,
+	(*Cmd).Break     ,
+	(*Cmd).Defer     ,
+	(*Cmd).Div       ,
+	(*Cmd).Eq        ,
+	(*Cmd).For       ,
+	(*Cmd).Func      ,
+	(*Cmd).Get       ,
+	(*Cmd).If        ,
+	(*Cmd).Less      ,
+	(*Cmd).List      ,
+	(*Cmd).Map       ,
+	(*Cmd).Mod       ,
+	(*Cmd).Mul       ,
+	(*Cmd).Or        ,
+	(*Cmd).Panic     ,
+	(*Cmd).Print     ,
+	(*Cmd).Println   ,
+	(*Cmd).Read      ,
+	(*Cmd).Recover   ,
+	(*Cmd).Run       ,
+	(*Cmd).Set       ,
+	(*Cmd).Sub       ,
+}
+
+func builtinNum(str string) int {
+	switch str {
+		case "+":
+			return 1
+		case "&":
+			return 2
+		case "break":
+			return 3
+		case "defer":
+			return 4
+		case "/":
+			return 5
+		case "eq":
+			return 6
+		case "for":
+			return 7
+		case "func":
+			return 8
+		case "get":
+			return 9
+		case "if":
+			return 10
+		case "<":
+			return 11
+		case "list":
+			return 12
+		case "map":
+			return 13
+		case "mod":
+			return 14
+		case "*":
+			return 15
+		case "|":
+			return 16
+		case "panic":
+			return 17
+		case "print":
+			return 18
+		case "println":
+			return 19
+		case "read":
+			return 20
+		case "recover":
+			return 21
+		case "run":
+			return 22
+		case "set":
+			return 23
+		case "-":
+			return 24
+		default:
+			return -1
+	}
+	return -1
 }
 
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
@@ -137,56 +227,9 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 	var v interface{}
 	if c.Params != nil {
 		vars.Lev++
-		switch c.Op {
-		case "+":
-			v = c.Add(vars)
-		case "&":
-			v = c.And(vars)
-		case "break":
-			v = c.Break(vars)
-		case "defer":
-			v = c.Defer(vars)
-		case "/":
-			v = c.Div(vars)
-		case "eq":
-			v = c.Eq(vars)
-		case "for":
-			v = c.For(vars)
-		case "func":
-			v = c.Func(vars)
-		case "get":
-			v = c.Get(vars)
-		case "if":
-			v = c.If(vars)
-		case "<":
-			v = c.Less(vars)
-		case "list":
-			v = c.List(vars)
-		case "map":
-			v = c.Map(vars)
-		case "mod":
-			v = c.Mod(vars)
-		case "*":
-			v = c.Mul(vars)
-		case "|":
-			v = c.Or(vars)
-		case "panic":
-			v = c.Panic(vars)
-		case "print":
-			v = c.Print(vars)
-		case "println":
-			v = c.Println(vars)
-		case "read":
-			v = c.Read(vars)
-		case "recover":
-			v = c.Recover(vars)
-		case "run":
-			v = c.Run(vars)
-		case "set":
-			v = c.Set(vars)
-		case "-":
-			v = c.Sub(vars)
-		default:			// Not builtin function call.
+		if c.Builtin > 0 {
+			v = builtins[c.Builtin-1](c, vars)
+		} else {
 			fun := vars.Get(c.Op)
 			if val, k := fun.(*Func); k {
 				params := []interface{}{}
@@ -322,7 +365,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	} else {
 		name = "lambda"
 	}
-	nvar := &Vars{Sym:make([]map[string]interface{}, 50), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
+	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars: nvar}
 	if len(c.Params) == co + 2 {		// Has parameters.

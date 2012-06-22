@@ -13,14 +13,14 @@ func evalErr() {
 
 func Eval(cmd Cmd) interface{} {
 	//defer evalErr()
-	vars := Vars{Sym: make([]map[string]interface{}, 50), Jump: &Jump{}}
+	vars := Vars{Sym: make([]map[string]interface{}, max_depth), Jump: &Jump{}}
 	ev := cmd.Eval(&vars)
 	return ev
 }
 
 func EvalWith(cmd Cmd, inp map[string]interface{}) interface{} {
 	//defer evalErr()
-	vars := Vars{Sym: make([]map[string]interface{}, 50), Jump: &Jump{}}
+	vars := Vars{Sym: make([]map[string]interface{}, max_depth), Jump: &Jump{}}
 	vars.Sym[0] = map[string]interface{}{"en":inp}
 	ev := cmd.Eval(&vars)
 	return ev

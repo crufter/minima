@@ -100,7 +100,7 @@ func Parse(tokens []string) Cmd {
 				op = tokens[i+1]
 				jump = 1
 			}
-			cmd := &Cmd{op,[]*Cmd{},nil, nil}
+			cmd := &Cmd{op,builtinNum(op),[]*Cmd{},nil, nil}
 			if len(s) > 0 {
 				cmd.ParentCmd = s[len(s)-1] // To be able to traversal upward (for example in panic).
 				s[len(s)-1].Params = append(s[len(s)-1].Params, cmd)
