@@ -3,6 +3,7 @@ package minima
 import(
 	"fmt"
 	"github.com/opesun/lexer"
+	"strconv"
 )
 
 const(
@@ -86,6 +87,21 @@ func parsErr() {
 	}
 }
 
+func kind(str string) (interface{}, int) {
+	if len(str) > 2  && string(str[0]) == `"` && string(str[len(str)-1]) == `"` {
+		return str[1:len(str)-1], st
+	} else if _int, err := strconv.ParseInt(str, 10, 32); err == nil {
+		return int(_int), in
+	} else if flo, err := strconv.ParseFloat(str, 32); err == nil {
+		return flo, fl
+	} else if str == true_str {
+		return true, bo
+	} else if str == false_str {
+		return false, bo
+	}
+	return str, id
+}
+
 func Parse(tokens []string) Cmd {
 	defer parsErr()
 	s := []*Cmd{}
@@ -100,7 +116,8 @@ func Parse(tokens []string) Cmd {
 				op = tokens[i+1]
 				jump = 1
 			}
-			cmd := &Cmd{op,builtinNum(op),[]*Cmd{},nil, nil}
+			val, t := kind(op)
+			cmd := &Cmd{op,builtinNum(op),[]*Cmd{},nil, nil,t,val}
 			if len(s) > 0 {
 				cmd.ParentCmd = s[len(s)-1] // To be able to traversal upward (for example in panic).
 				s[len(s)-1].Params = append(s[len(s)-1].Params, cmd)
@@ -114,7 +131,8 @@ func Parse(tokens []string) Cmd {
 			s = s[:len(s)-1]
 			i++
 		} else {
-			cmd := Cmd{Op:tokens[i]}
+			val, t := kind(tokens[i])
+			cmd := Cmd{Op:tokens[i],Value:val,Kind:t}
 			c := s[len(s)-1]
 			c.Params = append(c.Params, &cmd)
 			i++

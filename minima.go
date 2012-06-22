@@ -2,7 +2,6 @@ package minima
 
 import(
 	"fmt"
-	"strconv"
 )
 
 const(
@@ -15,23 +14,11 @@ const(
 
 const (
 	panic_varname = "prob"
+	lambda_name = "lambda"
 	max_depth = 50
+	true_str = "true"
+	false_str = "false"
 )
-
-func kind(str string) (interface{}, int) {
-	if len(str) > 2  && string(str[0]) == `"` && string(str[len(str)-1]) == `"` {
-		return str[1:len(str)-1], st
-	} else if _int, err := strconv.ParseInt(str, 10, 32); err == nil {
-		return int(_int), in
-	} else if flo, err := strconv.ParseFloat(str, 32); err == nil {
-		return flo, fl
-	} else if str == "true" {
-		return true, bo
-	} else if str == "false" {
-		return false, bo
-	}
-	return str, id
-}
 
 type Func struct {
 	Vars 	*Vars
@@ -131,7 +118,9 @@ type Cmd struct {
 	Builtin		int
 	Params		[]*Cmd
 	ParentCmd 	*Cmd			// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
-	ParentFunc 	*Func			// 
+	ParentFunc 	*Func			//
+	Kind		int
+	Value		interface{}
 }
 
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
@@ -163,12 +152,11 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		vars.Sym[vars.Lev] = nil
 		vars.Lev--
 	} else {
-		val, ki := kind(c.Op)
-		switch ki {
+		switch c.Kind {
 		case id:
-			v = vars.Get(val.(string))
+			v = vars.Get(c.Value.(string))
 		default:
-			v = val
+			v = c.Value
 		}
 	}
 	return v
@@ -279,7 +267,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 		name = c.Params[0].Op
 		co++
 	} else {
-		name = "lambda"
+		name = lambda_name
 	}
 	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
