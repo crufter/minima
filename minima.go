@@ -28,11 +28,11 @@ type Func struct {
 	Defers	[]*Cmd
 }
 
-func (f *Func) Eval(vars *Vars, params []interface{}) interface{} {
+func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
 	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
 	copy(nvar.Sym, f.Vars.Sym)
 	for i, v := range f.Args {
-		nvar.Set(v, params[i])
+		nvar.Set(v, (*params)[i])
 	}
 	v := f.Com.Eval(nvar)
 	recovered := false
@@ -80,7 +80,7 @@ type Vars struct {
 	Jump	*Jump
 }
 
-func (v Vars) Get(varname string) interface{} {
+func (v *Vars) Get(varname string) interface{} {
 	var ret interface{}
 	for i:=v.Lev-1; i>=0 ;i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
@@ -94,7 +94,7 @@ func (v Vars) Get(varname string) interface{} {
 }
 
 // Equals to = in Go.
-func (v Vars) Mod(varname string, val interface{}) {
+func (v *Vars) Mod(varname string, val interface{}) {
 	for i:=v.Lev-1; i>=0 ;i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
 			_, ok := v.Sym[i][varname]
@@ -106,7 +106,7 @@ func (v Vars) Mod(varname string, val interface{}) {
 }
 
 // Equals to := in Go.
-func (v Vars) Set(varname string, val interface{}) {
+func (v *Vars) Set(varname string, val interface{}) {
 	if v.Sym[v.Lev-1] == nil {
 		v.Sym[v.Lev-1] = map[string]interface{}{}
 	}
@@ -137,11 +137,11 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		} else {
 			fun := vars.Get(c.Op)
 			if val, k := fun.(*Func); k {
-				params := []interface{}{}
+				params := make([]interface{}, 0, 10)
 				for _, va := range c.Params {
 					params = append(params, va.Eval(vars))
 				}
-				v = val.Eval(vars, params)
+				v = val.Eval(vars, &params)
 			} else {
 				if _, isF := fun.(Func); isF {
 					panic("Somewhere there is a Func set instead of *Func, name: " + c.Op)
@@ -152,10 +152,9 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		vars.Sym[vars.Lev] = nil
 		vars.Lev--
 	} else {
-		switch c.Kind {
-		case id:
+		if c.Kind == id {
 			v = vars.Get(c.Value.(string))
-		default:
+		} else {
 			v = c.Value
 		}
 	}
