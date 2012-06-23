@@ -102,8 +102,20 @@ func kind(str string) (interface{}, int) {
 	return str, id
 }
 
+func genIDName(name string, m *map[string]uint, c *uint) uint {
+	if val, ok := (*m)[name]; ok {
+		return val
+	}
+	v := *c
+	(*m)[name] = v
+	*c++
+	return v
+}
+
 func Parse(tokens []string) Cmd {
 	defer parsErr()
+	names := &map[string]uint{lambda_varstr:lambda_name,panic_varstr:panic_name}
+	var namec uint = 2
 	s := []*Cmd{}
 	for i := 0; i < len(tokens); {
 		tok := tokens[i]
@@ -117,7 +129,11 @@ func Parse(tokens []string) Cmd {
 				jump = 1
 			}
 			val, t := kind(op)
-			cmd := &Cmd{op,builtinNum(op),[]*Cmd{},nil, nil,t,val}
+			bui := builtinNum(op)
+			cmd := &Cmd{op,0,bui,[]*Cmd{},nil, nil,t,val}
+			if t == id && bui == -1 {
+				cmd.IDName = genIDName(op, names, &namec)
+			}
 			if len(s) > 0 {
 				cmd.ParentCmd = s[len(s)-1] // To be able to traversal upward (for example in panic).
 				s[len(s)-1].Params = append(s[len(s)-1].Params, cmd)
@@ -131,8 +147,11 @@ func Parse(tokens []string) Cmd {
 			s = s[:len(s)-1]
 			i++
 		} else {
-			val, t := kind(tokens[i])
-			cmd := Cmd{Op:tokens[i],Value:val,Kind:t}
+			val, t := kind(tok)
+			cmd := Cmd{Op:tok,IDName:0,Value:val,Kind:t}
+			if t == id {
+				cmd.IDName = genIDName(tok, names, &namec)
+			}
 			c := s[len(s)-1]
 			c.Params = append(c.Params, &cmd)
 			i++

@@ -13,8 +13,10 @@ const(
 )
 
 const (
-	panic_varname = "prob"
-	lambda_name = "lambda"
+	panic_varstr = "prob"
+	panic_name = 1
+	lambda_varstr = "lambda"
+	lambda_name = 0
 	max_depth = 50
 	true_str = "true"
 	false_str = "false"
@@ -22,14 +24,14 @@ const (
 
 type Func struct {
 	Vars 	*Vars
-	Args 	[]string
+	Args 	[]uint
 	Com 	*Cmd
 	Recover	*Cmd
 	Defers	[]*Cmd
 }
 
 func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
-	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
+	nvar := &Vars{Sym:make([]map[uint]interface{}, max_depth), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
 	copy(nvar.Sym, f.Vars.Sym)
 	for i, v := range f.Args {
 		nvar.Set(v, (*params)[i])
@@ -42,7 +44,7 @@ func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
 		// Also think about the ugliness of writing data into the Func.
 		f.Vars.Jump.Type = 0
 		nvar.Lev++	// Hack to inject local var into recover.
-		nvar.Set(panic_varname, f.Vars.Jump.Dat.(*Panic).Reason)
+		nvar.Set(panic_name, f.Vars.Jump.Dat.(*Panic).Reason)
 		nvar.Lev--
 		v = f.Recover.Eval(nvar)
 	}
@@ -50,7 +52,7 @@ func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
 		for _, com := range f.Defers {
 			if recovered {
 				nvar.Lev++	// Hack to inject local var into refers.
-				nvar.Set(panic_varname, f.Vars.Jump.Dat.(*Panic).Reason)
+				nvar.Set(panic_name, f.Vars.Jump.Dat.(*Panic).Reason)
 				nvar.Lev--
 			}
 			com.Eval(nvar)
@@ -75,12 +77,12 @@ type Jump struct {
 
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
 type Vars struct {
-	Sym 	[]map[string]interface{}
+	Sym 	[]map[uint]interface{}
 	Lev 	int
 	Jump	*Jump
 }
 
-func (v *Vars) Get(varname string) interface{} {
+func (v *Vars) Get(varname uint) interface{} {
 	var ret interface{}
 	for i:=v.Lev-1; i>=0 ;i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
@@ -94,7 +96,7 @@ func (v *Vars) Get(varname string) interface{} {
 }
 
 // Equals to = in Go.
-func (v *Vars) Mod(varname string, val interface{}) {
+func (v *Vars) Mod(varname uint, val interface{}) {
 	for i:=v.Lev-1; i>=0 ;i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
 			_, ok := v.Sym[i][varname]
@@ -106,15 +108,16 @@ func (v *Vars) Mod(varname string, val interface{}) {
 }
 
 // Equals to := in Go.
-func (v *Vars) Set(varname string, val interface{}) {
+func (v *Vars) Set(varname uint, val interface{}) {
 	if v.Sym[v.Lev-1] == nil {
-		v.Sym[v.Lev-1] = map[string]interface{}{}
+		v.Sym[v.Lev-1] = map[uint]interface{}{}
 	}
 	v.Sym[v.Lev-1][varname] = val
 }
 
 type Cmd struct {
 	Op 			string
+	IDName		uint
 	Builtin		int
 	Params		[]*Cmd
 	ParentCmd 	*Cmd			// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
@@ -135,7 +138,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		if c.Builtin > 0 {
 			v = builtins[c.Builtin-1](c, vars)
 		} else {
-			fun := vars.Get(c.Op)
+			fun := vars.Get(c.IDName)
 			if val, k := fun.(*Func); k {
 				params := make([]interface{}, 0, 10)
 				for _, va := range c.Params {
@@ -146,6 +149,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 				if _, isF := fun.(Func); isF {
 					panic("Somewhere there is a Func set instead of *Func, name: " + c.Op)
 				}
+				fmt.Println(c.IDName)
 				panic("Call of non-function " + c.Op)
 			}
 		}
@@ -153,7 +157,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 		vars.Lev--
 	} else {
 		if c.Kind == id {
-			v = vars.Get(c.Value.(string))
+			v = vars.Get(c.IDName)
 		} else {
 			v = c.Value
 		}
@@ -233,7 +237,7 @@ func (c *Cmd) For(vars *Vars) interface{} {
 	if k == in {
 		val = v.(int)
 	} else if k == id {
-		val = vars.Get(v.(string)).(int)
+		val = vars.Get(c.Params[0].IDName).(int)
 	}
 	for i:=0;i<val;i++{
 		if vars.Jump.Type != 0 {
@@ -260,21 +264,21 @@ func (c *Cmd) For(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Func(vars *Vars) interface{} {
-	var name string
+	var name uint
 	co := 0
 	if c.Params[0].Params == nil {
-		name = c.Params[0].Op
+		name = c.Params[0].IDName
 		co++
 	} else {
 		name = lambda_name
 	}
-	nvar := &Vars{Sym:make([]map[string]interface{}, max_depth), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
+	nvar := &Vars{Sym:make([]map[uint]interface{}, max_depth), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars: nvar}
 	if len(c.Params) == co + 2 {		// Has parameters.
-		args := []string{c.Params[co].Op}
+		args := []uint{c.Params[co].IDName}
 		for _, v := range c.Params[co].Params {
-			args = append(args, v.Op)
+			args = append(args, v.IDName)
 		}
 		f.Args = args
 		co++
@@ -291,8 +295,7 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Get(vars *Vars) interface{} {
-	val, _ := kind(c.Params[0].Op)
-	return vars.Get(val.(string))
+	return vars.Get(c.Params[0].IDName)
 }
 
 // TODO: current syntax rules makes a the second and third param of if (call anything) tp ((call anything)) which means (run (call anything))
@@ -321,7 +324,7 @@ func (c *Cmd) Map(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Mod(vars *Vars) interface{} {
-	vname := c.Params[0].Op
+	vname := c.Params[0].IDName
 	var v interface{}
 	v = c.Params[1].Eval(vars)
 	vars.Mod(vname, v)
@@ -414,7 +417,7 @@ func (c *Cmd) Run(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Set(vars *Vars) interface{} {
-	vname := c.Params[0].Op
+	vname := c.Params[0].IDName
 	var v interface{}
 	v = c.Params[1].Eval(vars)
 	vars.Set(vname, v)
