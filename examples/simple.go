@@ -1,13 +1,12 @@
 package main
 
-import(
+import (
 	"fmt"
-	"time"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var oldstyle =
-`
+var oldstyle = `
 -- This is a comment.
 (set n (+ 2 1))
 (set x 8)
@@ -18,8 +17,7 @@ var oldstyle =
 	(println "n is greater or equal than " x))
 (for n (println "n is " n))
 `
-var newstyle =
-`
+var newstyle = `
 -- This is a comment
 set n (+ 2 1)
 set x 8

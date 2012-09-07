@@ -1,11 +1,10 @@
 package main
 
-import(
+import (
 	"github.com/opesun/minima"
 )
 
-var src =
-`
+var src = `
 println (& false false)
 println (& false true)
 println (& true false)

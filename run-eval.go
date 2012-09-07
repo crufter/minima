@@ -1,11 +1,11 @@
 package minima
 
-import(
+import (
 	"fmt"
 )
 
 func evalErr() {
-	r := recover();
+	r := recover()
 	if r != nil {
 		fmt.Println("An error during eval occured:", r)
 	}

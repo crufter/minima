@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 set x 20
 set i 0
 for x

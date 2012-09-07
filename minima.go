@@ -1,10 +1,10 @@
 package minima
 
-import(
+import (
 	"fmt"
 )
 
-const(
+const (
 	id = iota
 	st
 	fl
@@ -13,37 +13,37 @@ const(
 )
 
 const (
-	panic_varstr = "prob"
-	panic_name = 1
+	panic_varstr  = "prob"
+	panic_name    = 1
 	lambda_varstr = "lambda"
-	lambda_name = 0
-	max_depth = 50
-	true_str = "true"
-	false_str = "false"
+	lambda_name   = 0
+	max_depth     = 50
+	true_str      = "true"
+	false_str     = "false"
 )
 
 type Func struct {
-	Vars 	*Vars
-	Args 	[]uint
-	Com 	*Cmd
-	Recover	*Cmd
-	Defers	[]*Cmd
+	Vars    *Vars
+	Args    []uint
+	Com     *Cmd
+	Recover *Cmd
+	Defers  []*Cmd
 }
 
 func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
-	nvar := &Vars{Sym:make([]map[uint]interface{}, max_depth), Lev:f.Vars.Lev, Jump:f.Vars.Jump}	// Support for recursion.
+	nvar := &Vars{Sym: make([]map[uint]interface{}, max_depth), Lev: f.Vars.Lev, Jump: f.Vars.Jump} // Support for recursion.
 	copy(nvar.Sym, f.Vars.Sym)
 	for i, v := range f.Args {
 		nvar.Set(v, (*params)[i])
 	}
 	v := f.Com.Eval(nvar)
 	recovered := false
-	if f.Vars.Jump.Type == 2 && f.Recover != nil {	// Panic
+	if f.Vars.Jump.Type == 2 && f.Recover != nil { // Panic
 		recovered = true
 		// Think again about attaching a recover to a given Func. Recover command runs every time but it is unnecessary after the first evaluation.
 		// Also think about the ugliness of writing data into the Func.
 		f.Vars.Jump.Type = 0
-		nvar.Lev++	// Hack to inject local var into recover.
+		nvar.Lev++ // Hack to inject local var into recover.
 		nvar.Set(panic_name, f.Vars.Jump.Dat.(*Panic).Reason)
 		nvar.Lev--
 		v = f.Recover.Eval(nvar)
@@ -51,7 +51,7 @@ func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
 	if f.Defers != nil {
 		for _, com := range f.Defers {
 			if recovered {
-				nvar.Lev++	// Hack to inject local var into refers.
+				nvar.Lev++ // Hack to inject local var into refers.
 				nvar.Set(panic_name, f.Vars.Jump.Dat.(*Panic).Reason)
 				nvar.Lev--
 			}
@@ -62,29 +62,29 @@ func (f *Func) Eval(vars *Vars, params *[]interface{}) interface{} {
 }
 
 type Break struct {
-	Lev		int
-	RetVal 	interface{}
+	Lev    int
+	RetVal interface{}
 }
 
 type Panic struct {
-	Reason	string
+	Reason string
 }
 
 type Jump struct {
-	Type	int		// 0 Nothing 1 Break 2 Exc
-	Dat	interface{}
+	Type int // 0 Nothing 1 Break 2 Exc
+	Dat  interface{}
 }
 
 // I sense some ignorance of multithreading here, but hey, it's just a prototype.
 type Vars struct {
-	Sym 	[]map[uint]interface{}
-	Lev 	int
-	Jump	*Jump
+	Sym  []map[uint]interface{}
+	Lev  int
+	Jump *Jump
 }
 
 func (v *Vars) Get(varname uint) interface{} {
 	var ret interface{}
-	for i:=v.Lev-1; i>=0 ;i-- {
+	for i := v.Lev - 1; i >= 0; i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
 			ret, ok := v.Sym[i][varname]
 			if ok {
@@ -97,7 +97,7 @@ func (v *Vars) Get(varname uint) interface{} {
 
 // Equals to = in Go.
 func (v *Vars) Mod(varname uint, val interface{}) {
-	for i:=v.Lev-1; i>=0 ;i-- {
+	for i := v.Lev - 1; i >= 0; i-- {
 		if v.Sym[i] != nil && len(v.Sym[i]) > 0 {
 			_, ok := v.Sym[i][varname]
 			if ok {
@@ -116,14 +116,14 @@ func (v *Vars) Set(varname uint, val interface{}) {
 }
 
 type Cmd struct {
-	Op 			string
-	IDName		uint
-	Builtin		int
-	Params		[]*Cmd
-	ParentCmd 	*Cmd			// Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
-	ParentFunc 	*Func			//
-	Kind		int
-	Value		interface{}
+	Op         string
+	IDName     uint
+	Builtin    int
+	Params     []*Cmd
+	ParentCmd  *Cmd  // Both ParentCmd and ParentFunc here just to support panics or panic-like magic.
+	ParentFunc *Func //
+	Kind       int
+	Value      interface{}
 }
 
 // TODO: refactor code to get rid of a lot of evaling inside builtins.
@@ -167,7 +167,7 @@ func (c *Cmd) Eval(vars *Vars) interface{} {
 
 func (c *Cmd) Add(vars *Vars) interface{} {
 	var res int
-	for _, v := range c.Params{
+	for _, v := range c.Params {
 		res += v.Eval(vars).(int)
 	}
 	return res
@@ -187,7 +187,7 @@ func (c *Cmd) And(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Break(vars *Vars) interface{} {
-	b := &Break{Lev:1}
+	b := &Break{Lev: 1}
 	l := len(c.Params)
 	if l == 2 {
 		b.RetVal = c.Params[1].Eval(vars)
@@ -221,7 +221,7 @@ func (c *Cmd) Defer(vars *Vars) interface{} {
 
 func (c *Cmd) Div(vars *Vars) interface{} {
 	res := c.Params[0].Eval(vars).(int)
-	for i:=1; i<len(c.Params); i++ {
+	for i := 1; i < len(c.Params); i++ {
 		res /= c.Params[i].Eval(vars).(int)
 	}
 	return res
@@ -239,7 +239,7 @@ func (c *Cmd) For(vars *Vars) interface{} {
 	} else if k == id {
 		val = vars.Get(c.Params[0].IDName).(int)
 	}
-	for i:=0;i<val;i++{
+	for i := 0; i < val; i++ {
 		if vars.Jump.Type != 0 {
 			if vars.Jump.Type == 1 {
 				b, _ := vars.Jump.Dat.(*Break)
@@ -272,10 +272,10 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 	} else {
 		name = lambda_name
 	}
-	nvar := &Vars{Sym:make([]map[uint]interface{}, max_depth), Lev:vars.Lev, Jump:vars.Jump}	// TODO: think about the Lev+1 later.
+	nvar := &Vars{Sym: make([]map[uint]interface{}, max_depth), Lev: vars.Lev, Jump: vars.Jump} // TODO: think about the Lev+1 later.
 	copy(nvar.Sym, vars.Sym)
 	f := Func{Vars: nvar}
-	if len(c.Params) == co + 2 {		// Has parameters.
+	if len(c.Params) == co+2 { // Has parameters.
 		args := []uint{c.Params[co].IDName}
 		for _, v := range c.Params[co].Params {
 			args = append(args, v.IDName)
@@ -284,14 +284,14 @@ func (c *Cmd) Func(vars *Vars) interface{} {
 		co++
 	}
 	f.Com = c.Params[co]
-	c.Params[co].ParentFunc = &f				// To support panics.
-	vars.Set(name, &f)							// Not sure if it will be kept.
+	c.Params[co].ParentFunc = &f // To support panics.
+	vars.Set(name, &f)           // Not sure if it will be kept.
 	f.Vars.Set(name, &f)
 	f.Vars.Lev++
 	// TODO: think about the possible inconsistency what a nils cause when we imagine vars as a []map[string]interface{} in terms of references.
 	// For example: x := make(map[string]interface{}, 10); copying it to a new slice and Vars.Setting variables assuming that both will updated will only work
 	// if the maps are already existing and not nil.
-	return &f		// f instead of &f was a source of "Somewhere..." etc panic
+	return &f // f instead of &f was a source of "Somewhere..." etc panic
 }
 
 func (c *Cmd) Get(vars *Vars) interface{} {
@@ -333,7 +333,7 @@ func (c *Cmd) Mod(vars *Vars) interface{} {
 
 func (c *Cmd) Mul(vars *Vars) interface{} {
 	res := 1
-	for _, v := range c.Params{
+	for _, v := range c.Params {
 		res *= v.Eval(vars).(int)
 	}
 	return res
@@ -364,7 +364,7 @@ func (c *Cmd) Print(vars *Vars) interface{} {
 	for i, v := range c.Params {
 		val := v.Eval(vars)
 		fmt.Print(val)
-		if i == l - 1 {
+		if i == l-1 {
 			return val
 		}
 	}
@@ -378,7 +378,7 @@ func (c *Cmd) Println(vars *Vars) interface{} {
 }
 
 func (c *Cmd) Read(vars *Vars) interface{} {
-		return nil
+	return nil
 }
 
 func (c *Cmd) Recover(vars *Vars) interface{} {
@@ -427,7 +427,7 @@ func (c *Cmd) Set(vars *Vars) interface{} {
 func (c *Cmd) Sub(vars *Vars) interface{} {
 	var res int
 	first := true
-	for _, v := range c.Params{
+	for _, v := range c.Params {
 		va := v.Eval(vars).(int)
 		if first {
 			res = va

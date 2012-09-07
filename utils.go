@@ -1,6 +1,6 @@
 package minima
 
-import(
+import (
 	"fmt"
 	"strings"
 )

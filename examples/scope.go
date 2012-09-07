@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 -- This is a comment
 set a 1
 if (< 0 1)

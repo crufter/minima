@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 func f (run
 	defer (println 0)
 	defer (println 1)

@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 -- Lambda refers to the last defined lambda function, in this case the function itself.
 set n 10000
 set z 0

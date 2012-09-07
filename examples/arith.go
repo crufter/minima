@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 set x 10
 println (- x 7)
 `

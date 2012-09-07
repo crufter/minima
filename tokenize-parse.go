@@ -1,12 +1,12 @@
 package minima
 
-import(
+import (
 	"fmt"
 	"github.com/opesun/lexer"
 	"strconv"
 )
 
-const(
+const (
 	itemIgnore = iota
 	itemRParen
 	itemLParen
@@ -19,16 +19,16 @@ const(
 )
 
 var token_exrps_clear = []lexer.TokenExpr{
-    {`[ ]+`,										itemIgnore},	// Whitespace
-    {`\-\-[^\n]*`,									itemIgnore},	// Comment
-	{`\n`,											-itemNewLine},	// Newline
-	{`\t`,											-itemTab},
-	{`;`,											itemSemi},
-    {`\(`,											itemRParen},
-    {`\)`,											itemLParen},
-    {`[0-9]+`,										itemInt},
-	{`"(?:[^"\\]|\\.)*"`,							itemString},
-    {`[\<\>\!\=\+\-\|\&\*\/A-Za-z][A-Za-z0-9_]*`,	itemID},
+	{`[ ]+`, itemIgnore},       // Whitespace
+	{`\-\-[^\n]*`, itemIgnore}, // Comment
+	{`\n`, -itemNewLine},       // Newline
+	{`\t`, -itemTab},
+	{`;`, itemSemi},
+	{`\(`, itemRParen},
+	{`\)`, itemLParen},
+	{`[0-9]+`, itemInt},
+	{`"(?:[^"\\]|\\.)*"`, itemString},
+	{`[\<\>\!\=\+\-\|\&\*\/A-Za-z][A-Za-z0-9_]*`, itemID},
 }
 
 // From beginning or end of source.
@@ -45,10 +45,10 @@ func clearNewlines(src string) string {
 // This is where we handle all the new style rules, we transform to old style simply.
 func Tokenize(source string) []string {
 	source = clearNewlines(source)
-	tokens, _ := lexer.Lex("(\n" + source + "\n)" , token_exrps_clear)
+	tokens, _ := lexer.Lex("(\n"+source+"\n)", token_exrps_clear)
 	toks := []string{}
 	last_ind := 0
-	for i := 0; i<len(tokens);i++ {
+	for i := 0; i < len(tokens); i++ {
 		v := tokens[i]
 		if v.Text == "\n" {
 			var next_ind int
@@ -58,16 +58,16 @@ func Tokenize(source string) []string {
 				next_ind = tokens[i+1].Occ
 			}
 			diff := next_ind - last_ind
-			last_ind = next_ind 
-			if len(tokens) != i + 1 && i > 0 && tokens[i-1].Text != "(" {
+			last_ind = next_ind
+			if len(tokens) != i+1 && i > 0 && tokens[i-1].Text != "(" {
 				if diff <= 0 {
-					toks = append(toks, ")")			// 1 implicit záró
-					for i:= 0; i<diff*(-1);i++ {		// plusz amennyit csökken
+					toks = append(toks, ")")         // 1 implicit záró
+					for i := 0; i < diff*(-1); i++ { // plusz amennyit csökken
 						toks = append(toks, ")")
 					}
 				}
 			}
-			if len(toks) > 0 && len(tokens) > i + 2 && tokens[i+2].Text != ")" {
+			if len(toks) > 0 && len(tokens) > i+2 && tokens[i+2].Text != ")" {
 				toks = append(toks, "(")
 			}
 		} else if v.Text == ";" {
@@ -81,15 +81,15 @@ func Tokenize(source string) []string {
 }
 
 func parsErr() {
-	r := recover();
+	r := recover()
 	if r != nil {
 		fmt.Println("An error during parsing occured:", r)
 	}
 }
 
 func kind(str string) (interface{}, int) {
-	if len(str) > 2  && string(str[0]) == `"` && string(str[len(str)-1]) == `"` {
-		return str[1:len(str)-1], st
+	if len(str) > 2 && string(str[0]) == `"` && string(str[len(str)-1]) == `"` {
+		return str[1 : len(str)-1], st
 	} else if _int, err := strconv.ParseInt(str, 10, 32); err == nil {
 		return int(_int), in
 	} else if flo, err := strconv.ParseFloat(str, 32); err == nil {
@@ -114,7 +114,7 @@ func genIDName(name string, m *map[string]uint, c *uint) uint {
 
 func Parse(tokens []string) Cmd {
 	defer parsErr()
-	names := &map[string]uint{lambda_varstr:lambda_name,panic_varstr:panic_name}
+	names := &map[string]uint{lambda_varstr: lambda_name, panic_varstr: panic_name}
 	var namec uint = 2
 	s := []*Cmd{}
 	for i := 0; i < len(tokens); {
@@ -122,7 +122,7 @@ func Parse(tokens []string) Cmd {
 		if tok == "(" {
 			var op string
 			jump := 0
-			if tokens[i+1] == "(" {		// Allows you to leave the "run" commmand and simply type (for 12 ((println "1") (println "2"))) instead of (for 12 (run (println "1") (println "2")))
+			if tokens[i+1] == "(" { // Allows you to leave the "run" commmand and simply type (for 12 ((println "1") (println "2"))) instead of (for 12 (run (println "1") (println "2")))
 				op = "run"
 			} else {
 				op = tokens[i+1]
@@ -130,7 +130,7 @@ func Parse(tokens []string) Cmd {
 			}
 			val, t := kind(op)
 			bui := builtinNum(op)
-			cmd := &Cmd{op,0,bui,[]*Cmd{},nil, nil,t,val}
+			cmd := &Cmd{op, 0, bui, []*Cmd{}, nil, nil, t, val}
 			if t == id && bui == -1 {
 				cmd.IDName = genIDName(op, names, &namec)
 			}
@@ -148,7 +148,7 @@ func Parse(tokens []string) Cmd {
 			i++
 		} else {
 			val, t := kind(tok)
-			cmd := Cmd{Op:tok,IDName:0,Value:val,Kind:t}
+			cmd := Cmd{Op: tok, IDName: 0, Value: val, Kind: t}
 			if t == id {
 				cmd.IDName = genIDName(tok, names, &namec)
 			}
@@ -162,4 +162,3 @@ func Parse(tokens []string) Cmd {
 	}
 	return *s[0]
 }
-	

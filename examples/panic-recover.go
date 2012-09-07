@@ -1,13 +1,12 @@
 package main
 
-import(
-	"time"
+import (
 	"fmt"
 	"github.com/opesun/minima"
+	"time"
 )
 
-var src =
-`
+var src = `
 func k (panic "OMG")
 func f (run
 	recover (run(println "Recovering from " prob) (+ 1 1))
